@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Flow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;600&family=Inter:wght@400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --spacing-s:   8px;
+      --spacing-m:  12px;
+      --spacing-lg: 16px;
+      --spacing-xl: 20px;
+      --colour-white:     #ffffff;
+      --colour-black:     #313131;
+      --colour-grey-100:  #f3f4f6;
+      --colour-grey-600:  #4b5563;
+      --glass-bg:     rgba(0, 0, 0, 0.2);
+      --glass-border: rgba(255, 255, 255, 0.3);
+      --font-doto:      'Doto', monospace;
+      --font-helvetica: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a1628;
+    }
+
+    /* ── App shell ── */
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Background scene ── */
+    .scene-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      display: block;
+      transition: opacity 0.5s ease;
+    }
+    .scene-bg.fading { opacity: 0; }
+
+    /* ══════════════════════════════════
+       HEADER
+    ══════════════════════════════════ */
+    .header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      padding: var(--spacing-xl) 40px;
+      backdrop-filter: blur(2px);
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    /* Lift above sticky note when menu is open */
+    .header.menu-open { z-index: 25; }
+
+    .navbar {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .logo {
+      font-family: var(--font-doto);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--colour-white);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Scene nav — hidden on mobile */
+    .scene-nav {
+      display: flex;
+      gap: var(--spacing-xl);
+      align-items: center;
+      font-family: var(--font-doto);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--colour-white);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .scene-nav span {
+      opacity: 0.4;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .scene-nav span:hover  { opacity: 0.7; }
+    .scene-nav span.active { opacity: 1; }
+
+    /* ── Menu button — mobile only ── */
+    .menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-m);
+      backdrop-filter: blur(12px);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .menu-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+    /* Menu icon states */
+    .menu-icon-default { display: flex; align-items: center; }
+    .menu-icon-open    { display: none;  align-items: center; }
+    .header.menu-open .menu-icon-default { display: none; }
+    .header.menu-open .menu-icon-open    { display: flex; }
+
+    /* ── Mobile scene panel — edge-to-edge, no border-radius ── */
+    .mobile-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      flex-direction: column;
+      gap: var(--spacing-lg);
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.5);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Scene items inside mobile menu */
+    .mobile-menu [data-scene] {
+      font-family: var(--font-doto);
+      font-size: var(--spacing-lg);
+      font-weight: 600;
+      color: var(--colour-white);
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.15s;
+      width: 100%;
+    }
+    .mobile-menu [data-scene]:hover  { opacity: 0.7; }
+    .mobile-menu [data-scene].active { opacity: 1; }
+
+    /* ══════════════════════════════════
+       SHARED COMPONENT STYLES
+    ══════════════════════════════════ */
+    .pill-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-m) var(--spacing-xl);
+      backdrop-filter: blur(12px);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      font-family: var(--font-doto);
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--colour-white);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .pill-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+    /* Icon button (timer / sound) */
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-m);
+      backdrop-filter: blur(12px);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+    /* Sound button — 46×46 circle, reveals upward on click */
+    .sound-btn {
+      flex-direction: column-reverse; /* icon at bottom, options grow upward */
+      gap: 0;
+      padding: 13px;
+      width: 46px;
+      cursor: pointer;
+    }
+
+    .sound-icon-default {
+      overflow: hidden;
+      max-height: 20px;
+      opacity: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: max-height 0.25s ease, opacity 0.15s ease;
+    }
+
+    .sound-options {
+      display: flex;
+      flex-direction: column-reverse; /* options stack bottom-up so first item is nearest the icon */
+      align-items: center;
+      gap: var(--spacing-lg);
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: max-height 0.3s ease, opacity 0.2s ease 0.05s;
+    }
+
+    .sound-btn.is-open .sound-icon-default {
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.2s ease, opacity 0.15s ease;
+    }
+
+    .sound-btn.is-open .sound-options {
+      max-height: 200px;
+      opacity: 1;
+      pointer-events: auto;
+      transition: max-height 0.35s ease, opacity 0.2s ease 0.05s;
+    }
+
+    .sound-option {
+      width: 20px;
+      height: 20px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      opacity: 0.4;
+      transition: opacity 0.15s;
+    }
+    .sound-option img { width: 20px; height: 20px; display: block; }
+    .sound-option:hover { opacity: 0.7; }
+    .sound-option.is-active { opacity: 1; }
+
+    /* Tooltip */
+    .sound-tooltip {
+      position: fixed;
+      font-family: var(--font-doto);
+      font-size: 16px;
+      font-weight: 400;
+      color: white;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 200;
+      transform: translateY(-50%);
+    }
+    .sound-tooltip.visible { opacity: 1; }
+
+    /* ══════════════════════════════════
+       STICKY NOTE
+    ══════════════════════════════════ */
+    .sticky {
+      position: absolute;
+      width: 186px;
+      min-height: 160px;
+      background: #fff235;
+      padding: var(--spacing-lg);
+      box-shadow: -8px 8px 9px 0px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      cursor: grab;
+      user-select: none;
+    }
+    .sticky.is-dragging {
+      cursor: grabbing;
+      box-shadow: -10px 12px 18px 0px rgba(0, 0, 0, 0.5);
+    }
+
+    .sticky-inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-m);
+      width: 100%;
+      pointer-events: none;
+    }
+
+    /* Gap between individual task rows */
+    #task-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-m);
+    }
+
+    .sticky-title {
+      font-family: var(--font-helvetica);
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--colour-black);
+      line-height: normal;
+    }
+
+    .task-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      pointer-events: all;
+      cursor: default;
+    }
+
+    /* Checkbox */
+    .checkbox {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      min-width: 16px;
+      background: var(--colour-white);
+      border: 1px solid var(--colour-grey-100);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .checkbox:hover { border-color: #9ca3af; }
+
+    /* Task label */
+    .task-label {
+      font-family: var(--font-helvetica);
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--colour-grey-600);
+      line-height: 1.4;
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .task-label.done {
+      text-decoration: line-through;
+      font-style: italic;
+      opacity: 0.7;
+    }
+    .task-label.placeholder { opacity: 0.45; cursor: text; }
+
+    /* Inline task input (edit mode) */
+    .task-input {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      font-family: var(--font-helvetica);
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--colour-grey-600);
+      line-height: 1.4;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      cursor: text;
+      pointer-events: all;
+      resize: none;
+      overflow: hidden;
+    }
+
+    /* ══════════════════════════════════
+       BOTTOM CONTROLS
+    ══════════════════════════════════ */
+    .controls {
+      position: absolute;
+      bottom: 44px;
+      left: 40px;
+      right: 40px;
+      z-index: 10;
+      display: flex;
+      flex-direction: row;
+      gap: var(--spacing-lg);
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    /* Player */
+    .player {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-lg);
+      backdrop-filter: blur(12px);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--spacing-s);
+      flex-shrink: 0;
+    }
+
+    .player-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .player-btn:hover { opacity: 0.7; }
+
+    .track-name {
+      font-family: var(--font-doto);
+      font-weight: 400;
+      font-size: 16px;
+      color: var(--colour-white);
+      white-space: nowrap;
+      line-height: normal;
+      flex-shrink: 0;
+      padding: 0 4px;
+    }
+
+    /* Mobile-only icon row (timer + sound beneath player) — hidden by default */
+    .controls-row2 {
+      display: none;
+      gap: var(--spacing-lg);
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ══════════════════════════════════
+       TIMER BUTTON STATES
+    ══════════════════════════════════ */
+
+    /* All three states always in flex; max-width + opacity drive transitions */
+    .timer-state {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      max-width: 0;
+      opacity: 0;
+      transition: opacity 0.2s ease, max-width 0.3s ease;
+      white-space: nowrap;
+    }
+
+    /* Default: clock visible */
+    .timer-default { max-width: 20px; opacity: 1; }
+
+    /* Hover (not running): clock out → play+label in */
+    .timer-btn:not(.is-running):hover .timer-default {
+      max-width: 0; opacity: 0;
+      transition: opacity 0.15s ease, max-width 0.25s ease;
+    }
+    .timer-btn:not(.is-running):hover .timer-hover {
+      max-width: 160px; opacity: 1;
+      transition: opacity 0.2s ease 0.1s, max-width 0.3s ease;
+    }
+
+    /* Running: clock out → stop in */
+    .timer-btn.is-running .timer-default { max-width: 0; opacity: 0; }
+    .timer-btn.is-running .timer-stop    { max-width: 20px; opacity: 1; }
+
+    .timer-start-label {
+      font-family: var(--font-doto);
+      font-size: 16px;
+      font-weight: 400;
+      color: white;
+      white-space: nowrap;
+    }
+
+    /* ══════════════════════════════════
+       POMODORO OVERLAY
+    ══════════════════════════════════ */
+    #pomodoro-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: column;
+      gap: var(--spacing-m);
+      padding: 164px 0 80px;
+    }
+    #pomodoro-overlay.active { display: flex; }
+
+    .pomo-label {
+      font-family: var(--font-doto);
+      font-weight: 600;
+      font-size: 24px;
+      color: white;
+      white-space: nowrap;
+    }
+
+    .pomo-time {
+      font-family: var(--font-doto);
+      font-weight: 600;
+      font-size: 80px;
+      color: white;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .pomo-pause-btn {
+      pointer-events: all;
+    }
+
+    /* ══════════════════════════════════
+       MOBILE  ≤ 639px
+    ══════════════════════════════════ */
+    @media (max-width: 639px) {
+      .header { padding: var(--spacing-xl) 24px; }
+
+      /* Scene nav hidden — accessed via mobile menu */
+      .scene-nav { display: none; }
+
+      /* Show menu button on mobile */
+      .menu-btn { display: flex; }
+
+      /* Show mobile scene panel when menu is open */
+      .header.menu-open .mobile-menu { display: flex; }
+
+      /* Hide sticky note when mobile menu is open */
+      .header.menu-open ~ .sticky {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+      }
+
+      .controls {
+        flex-direction: column;
+        left: 24px;
+        right: 24px;
+        align-items: center;
+      }
+
+      /* Make player span full width on mobile */
+      .player { width: 100%; }
+
+      /* Hide individual icon-btns from top row — moved into row2 */
+      .controls > .icon-btn { display: none; }
+
+      /* Show the combined timer+sound row */
+      .controls-row2 { display: flex; }
+    }
+
+    /* Mobile panel never shows on tablet/desktop */
+    @media (min-width: 640px) {
+      .mobile-menu { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Background -->
+  <img class="scene-bg" src="Screens/Backgorund/scenes=focus.jpg" alt="Focus scene" />
+
+  <!-- Header -->
+  <header class="header" id="header">
+    <nav class="navbar">
+      <span class="logo">FOCUS FLOW</span>
+
+      <!-- Scene nav: desktop + tablet only -->
+      <div class="scene-nav">
+        <span data-scene="skyline">Skyline</span>
+        <span data-scene="calm">Calm</span>
+        <span data-scene="room">Room</span>
+        <span data-scene="focus" class="active">Focus</span>
+        <span data-scene="drive">Drive</span>
+      </div>
+
+      <!-- Menu button: mobile only -->
+      <button class="menu-btn" id="menu-btn" title="Scenes">
+        <span class="menu-icon-default">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="4"  r="1.5" fill="white"/>
+            <circle cx="10" cy="10" r="1.5" fill="white"/>
+            <circle cx="10" cy="16" r="1.5" fill="white"/>
+          </svg>
+        </span>
+        <span class="menu-icon-open">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M5 5L15 15M15 5L5 15" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+      </button>
+    </nav>
+
+    <!-- Mobile scene selection panel (edge-to-edge, flat list) -->
+    <div class="mobile-menu" id="mobile-menu">
+      <span data-scene="skyline">Skyline</span>
+      <span data-scene="calm">Calm</span>
+      <span data-scene="room">Room</span>
+      <span data-scene="focus" class="active">Focus</span>
+      <span data-scene="drive">Drive</span>
+    </div>
+  </header>
+
+  <!-- Sticky Task Note (position & content managed by JS) -->
+  <div class="sticky" id="sticky">
+    <div class="sticky-inner" id="sticky-inner">
+      <p class="sticky-title">Task for today</p>
+      <div id="task-list"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Controls -->
+  <div class="controls">
+
+    <!-- Timer (hidden on mobile via CSS) -->
+    <button class="icon-btn timer-btn" title="Timer">
+      <!-- default: clock -->
+      <span class="timer-state timer-default">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="11.5" r="6.5" stroke="white" stroke-width="1.5"/><path d="M10 8.5V11.5L12 13" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 2.5h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M10 2.5V4.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </span>
+      <!-- hover: play + label -->
+      <span class="timer-state timer-hover">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 4.5L16 10L6 15.5V4.5Z" fill="white"/></svg>
+        <span class="timer-start-label">Start Pomodoro</span>
+      </span>
+      <!-- running: stop square -->
+      <span class="timer-state timer-stop">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="4.5" y="4.5" width="11" height="11" rx="2" fill="white"/></svg>
+      </span>
+    </button>
+
+    <!-- Player -->
+    <div class="player">
+      <button class="player-btn" title="Previous">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M5 4.5V15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M15.5 4.5L7 10L15.5 15.5V4.5Z" fill="white"/>
+        </svg>
+      </button>
+
+      <span class="track-name">Lo Fi Music 1</span>
+
+      <button class="player-btn" title="Pause">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="5"    y="4" width="3.5" height="12" rx="1" fill="white"/>
+          <rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/>
+        </svg>
+      </button>
+
+      <button class="player-btn" title="Next">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M15 4.5V15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M4.5 4.5L13 10L4.5 15.5V4.5Z" fill="white"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Sound (hidden on mobile via CSS, row2 takes over) -->
+    <div class="icon-btn sound-btn" id="sound-btn-desktop" role="button" tabindex="0" title="Sound">
+      <div class="sound-icon-default">
+        <img src="icon/sound.png" width="20" height="20" alt="Sound">
+      </div>
+      <div class="sound-options">
+        <button class="sound-option is-active" data-sound="none" data-tooltip="No Sound">
+          <img src="icon/no sound.png" width="20" height="20" alt="No Sound">
+        </button>
+        <button class="sound-option" data-sound="campfire" data-tooltip="Campfire">
+          <img src="icon/campfire.png" width="20" height="20" alt="Campfire">
+        </button>
+        <button class="sound-option" data-sound="nature" data-tooltip="Nature">
+          <img src="icon/nature.png" width="20" height="20" alt="Nature">
+        </button>
+        <button class="sound-option" data-sound="waves" data-tooltip="Waves">
+          <img src="icon/waves.png" width="20" height="20" alt="Waves">
+        </button>
+        <button class="sound-option" data-sound="forest" data-tooltip="Forest">
+          <img src="icon/forest.png" width="20" height="20" alt="Forest">
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile-only: timer + sound in a row below player -->
+    <div class="controls-row2">
+      <button class="icon-btn timer-btn" title="Timer">
+        <span class="timer-state timer-default">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="11.5" r="6.5" stroke="white" stroke-width="1.5"/><path d="M10 8.5V11.5L12 13" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 2.5h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M10 2.5V4.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="timer-state timer-hover">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 4.5L16 10L6 15.5V4.5Z" fill="white"/></svg>
+          <span class="timer-start-label">Start Pomodoro</span>
+        </span>
+        <span class="timer-state timer-stop">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="4.5" y="4.5" width="11" height="11" rx="2" fill="white"/></svg>
+        </span>
+      </button>
+      <div class="icon-btn sound-btn" id="sound-btn-mobile" role="button" tabindex="0" title="Sound">
+        <div class="sound-icon-default">
+          <img src="icon/sound.png" width="20" height="20" alt="Sound">
+        </div>
+        <div class="sound-options">
+          <button class="sound-option is-active" data-sound="none" title="No Sound">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M4 7.5H7L11 4V16L7 12.5H4V7.5Z" fill="white"/>
+              <path d="M13.5 8.5L16.5 11.5M16.5 8.5L13.5 11.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="sound-option" data-sound="campfire" title="Campfire">
+            <img src="icon/campfire.png" width="20" height="20" alt="Campfire">
+          </button>
+          <button class="sound-option" data-sound="nature" title="Nature">
+            <img src="icon/nature.png" width="20" height="20" alt="Nature">
+          </button>
+          <button class="sound-option" data-sound="waves" title="Waves">
+            <img src="icon/waves.png" width="20" height="20" alt="Waves">
+          </button>
+          <button class="sound-option" data-sound="forest" title="Forest">
+            <img src="icon/forest.png" width="20" height="20" alt="Forest">
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sound tooltip -->
+  <div id="sound-tooltip" class="sound-tooltip"></div>
+
+  <!-- Pomodoro overlay (sits above bg, below controls) -->
+  <div id="pomodoro-overlay">
+    <div class="pomo-label" id="pomo-label">Session 1</div>
+    <div class="pomo-time"  id="pomo-time">20:00</div>
+    <button class="icon-btn pomo-pause-btn" id="pomo-pause-btn" title="Pause">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="white"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/></svg>
+    </button>
+  </div>
+
+</div>
+
+<script>
+  /* ══════════════════════════════════════
+     HEADER — mobile menu toggle
+  ══════════════════════════════════════ */
+  (function initHeader() {
+    var header     = document.getElementById('header');
+    var menuBtn    = document.getElementById('menu-btn');
+    var mobileMenu = document.getElementById('mobile-menu');
+    var menuOpen   = false;
+
+    function setMenuOpen(open) {
+      menuOpen = open;
+      header.classList.toggle('menu-open', open);
+    }
+
+    /* Toggle on button click */
+    menuBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      setMenuOpen(!menuOpen);
+    });
+
+    /* Close on outside click */
+    document.addEventListener('click', function(e) {
+      if (menuOpen && !header.contains(e.target)) setMenuOpen(false);
+    });
+
+    /* Close when a scene is picked from mobile menu */
+    mobileMenu.addEventListener('click', function(e) {
+      if (e.target.closest('[data-scene]')) setMenuOpen(false);
+    });
+  })();
+
+  /* ── Scene switching (works for both desktop nav + mobile accordion) ── */
+  const scenes = {
+    skyline: 'Screens/Backgorund/scenes=skyline.jpg',
+    calm:    'Screens/Backgorund/scenes=calm.jpg',
+    room:    'Screens/Backgorund/scenes=room.jpg',
+    focus:   'Screens/Backgorund/scenes=focus.jpg',
+    drive:   'Screens/Backgorund/scenes=drive.jpg',
+  };
+  const bg = document.querySelector('.scene-bg');
+
+  function switchScene(sceneName) {
+    if (!scenes[sceneName]) return;
+    /* Sync active on all [data-scene] elements */
+    document.querySelectorAll('[data-scene]').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.scene === sceneName);
+    });
+    bg.classList.add('fading');
+    setTimeout(function() {
+      bg.src = scenes[sceneName];
+      bg.onload = function() { bg.classList.remove('fading'); };
+    }, 250);
+  }
+
+  /* Desktop scene-nav */
+  document.querySelector('.scene-nav').addEventListener('click', function(e) {
+    const item = e.target.closest('[data-scene]');
+    if (!item || item.classList.contains('active')) return;
+    switchScene(item.dataset.scene);
+  });
+
+  /* Mobile scene panel — switch scene on tap */
+  document.getElementById('mobile-menu').addEventListener('click', function(e) {
+    const item = e.target.closest('[data-scene]');
+    if (!item || item.classList.contains('active')) return;
+    switchScene(item.dataset.scene);
+  });
+
+  /* ══════════════════════════════════════
+     STICKY NOTE
+  ══════════════════════════════════════ */
+  const CHECKMARK_SVG = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5L3.8 6.5L9 1" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  let tasks = [
+    { id: 1, text: 'Finish the pitch deck research', state: 'added' },
+    { id: 2, text: 'Set user interview',             state: 'checked' },
+  ];
+  let nextId = 3;
+  let editingId = null; /* null means not editing; 0 means the "add" row */
+
+  /* ── Render ── */
+  function renderTasks() {
+    const list = document.getElementById('task-list');
+    list.innerHTML = '';
+
+    tasks.forEach(task => {
+      const row = document.createElement('div');
+      row.className = 'task-row';
+
+      /* Checkbox */
+      const cb = document.createElement('div');
+      cb.className = 'checkbox';
+      cb.innerHTML = task.state === 'checked' ? CHECKMARK_SVG : '';
+      cb.addEventListener('click', () => toggleTask(task.id));
+
+      /* Label / input */
+      if (editingId === task.id) {
+        const input = makeInput(task.text, val => {
+          if (val.trim()) task.text = val.trim();
+          editingId = null;
+          renderTasks();
+        });
+        row.appendChild(cb);
+        row.appendChild(input);
+        list.appendChild(row);
+        input.focus();
+        input.select();
+        return;
+      }
+
+      const label = document.createElement('span');
+      label.className = 'task-label' + (task.state === 'checked' ? ' done' : '');
+      label.textContent = task.text;
+      label.addEventListener('dblclick', () => { editingId = task.id; renderTasks(); });
+
+      row.appendChild(cb);
+      row.appendChild(label);
+      list.appendChild(row);
+    });
+
+    /* "Add a task" row */
+    const addRow = document.createElement('div');
+    addRow.className = 'task-row';
+
+    const addCb = document.createElement('div');
+    addCb.className = 'checkbox';
+
+    if (editingId === 0) {
+      const input = makeInput('', val => {
+        if (val.trim()) tasks.push({ id: nextId++, text: val.trim(), state: 'added' });
+        editingId = null;
+        renderTasks();
+      });
+      addRow.appendChild(addCb);
+      addRow.appendChild(input);
+      list.appendChild(addRow);
+      input.focus();
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'task-label placeholder';
+      placeholder.textContent = 'Add a task';
+      addRow.addEventListener('click', () => { editingId = 0; renderTasks(); });
+      addRow.appendChild(addCb);
+      addRow.appendChild(placeholder);
+      list.appendChild(addRow);
+    }
+  }
+
+  function makeInput(initialValue, onCommit) {
+    const ta = document.createElement('textarea');
+    ta.className = 'task-input';
+    ta.value = initialValue;
+    ta.placeholder = 'Add a task';
+    ta.rows = 1;
+
+    /* Auto-grow height to fit content */
+    const autoGrow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+    ta.addEventListener('input', autoGrow);
+    /* Size correctly on first paint */
+    requestAnimationFrame(autoGrow);
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      onCommit(ta.value);
+    };
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { committed = true; editingId = null; renderTasks(); }
+    });
+    ta.addEventListener('blur', commit);
+    ta.addEventListener('mousedown', e => e.stopPropagation());
+    return ta;
+  }
+
+  function toggleTask(id) {
+    const t = tasks.find(t => t.id === id);
+    if (!t) return;
+    t.state = t.state === 'checked' ? 'added' : 'checked';
+    renderTasks();
+  }
+
+  /* ── Drag ── */
+  (function initDrag() {
+    const sticky = document.getElementById('sticky');
+
+    /* Place initial position */
+    sticky.style.left = '40px';
+    sticky.style.top  = '116px';
+
+    let dragging = false, ox = 0, oy = 0, sx = 0, sy = 0;
+
+    function getConstraints() {
+      const headerH   = document.querySelector('.header').offsetHeight;
+      const ctrlRect  = document.querySelector('.controls').getBoundingClientRect();
+      /* For mobile, also account for row2 if visible */
+      const row2      = document.querySelector('.controls-row2');
+      const row2H     = (row2 && getComputedStyle(row2).display !== 'none') ? row2.offsetHeight + 16 : 0;
+      const ctrlTop   = ctrlRect.top - row2H - 16;
+      const stickyW   = sticky.offsetWidth;
+      const stickyH   = sticky.offsetHeight;
+      return {
+        minX: 0,
+        maxX: window.innerWidth  - stickyW,
+        minY: headerH + 8,
+        maxY: ctrlTop - stickyH - 8,
+      };
+    }
+
+    function onStart(clientX, clientY) {
+      dragging = true;
+      ox = clientX; oy = clientY;
+      sx = sticky.offsetLeft; sy = sticky.offsetTop;
+      sticky.classList.add('is-dragging');
+    }
+
+    function onMove(clientX, clientY) {
+      if (!dragging) return;
+      const c    = getConstraints();
+      const newX = Math.max(c.minX, Math.min(c.maxX, sx + (clientX - ox)));
+      const newY = Math.max(c.minY, Math.min(c.maxY, sy + (clientY - oy)));
+      sticky.style.left = newX + 'px';
+      sticky.style.top  = newY + 'px';
+    }
+
+    function onEnd() {
+      dragging = false;
+      sticky.classList.remove('is-dragging');
+    }
+
+    /* Mouse */
+    sticky.addEventListener('mousedown', e => {
+      if (e.target.closest('.checkbox') || e.target.closest('input')) return;
+      e.preventDefault();
+      onStart(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+    document.addEventListener('mouseup',   onEnd);
+
+    /* Touch */
+    sticky.addEventListener('touchstart', e => {
+      if (e.target.closest('.checkbox') || e.target.closest('input')) return;
+      const t = e.touches[0];
+      onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  })();
+
+  /* ── Mobile: re-center sticky when it would overlap controls after resize ── */
+  window.addEventListener('resize', () => {
+    const sticky = document.getElementById('sticky');
+    const c = (function() {
+      const headerH  = document.querySelector('.header').offsetHeight;
+      const ctrlRect = document.querySelector('.controls').getBoundingClientRect();
+      const row2     = document.querySelector('.controls-row2');
+      const row2H    = (row2 && getComputedStyle(row2).display !== 'none') ? row2.offsetHeight + 16 : 0;
+      return {
+        minX: 0, maxX: window.innerWidth  - sticky.offsetWidth,
+        minY: headerH + 8,
+        maxY: ctrlRect.top - row2H - 16 - sticky.offsetHeight - 8,
+      };
+    })();
+    sticky.style.left = Math.max(c.minX, Math.min(c.maxX, sticky.offsetLeft)) + 'px';
+    sticky.style.top  = Math.max(c.minY, Math.min(c.maxY, sticky.offsetTop))  + 'px';
+  });
+
+  /* Mobile: center sticky horizontally */
+  if (window.innerWidth <= 639) {
+    const sticky = document.getElementById('sticky');
+    sticky.style.left = Math.round((window.innerWidth - sticky.offsetWidth) / 2) + 'px';
+    sticky.style.top  = '103px';
+  }
+
+  /* ══════════════════════════════════════
+     POMODORO
+  ══════════════════════════════════════ */
+  (function initPomodoro() {
+    var SESSIONS     = 3;
+    var SESSION_SECS = 20 * 60;
+    var BREAK_SECS   =  5 * 60;
+
+    var overlay    = document.getElementById('pomodoro-overlay');
+    var pomoLabel  = document.getElementById('pomo-label');
+    var pomoTime   = document.getElementById('pomo-time');
+    var pomoPause  = document.getElementById('pomo-pause-btn');
+    var timerBtns  = document.querySelectorAll('.timer-btn');
+
+    var state     = 'idle';
+    var session   = 0;
+    var remaining = 0;
+    var paused    = false;
+    var ticker    = null;
+
+    function fmt(secs) {
+      var m = Math.floor(secs / 60), s = secs % 60;
+      return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function setRunning(on) {
+      timerBtns.forEach(function(b) { b.classList.toggle('is-running', on); });
+    }
+
+    function setPauseIcon(isPaused) {
+      pomoPause.innerHTML = isPaused
+        ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 4.5L16 10L6 15.5V4.5Z" fill="white"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="white"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/></svg>';
+    }
+
+    function tick() {
+      if (paused) return;
+      remaining--;
+      pomoTime.textContent = fmt(remaining);
+      if (remaining > 0) return;
+      clearInterval(ticker); ticker = null;
+      if (state === 'session') {
+        if (session < SESSIONS) { startBreak(); } else { stopAll(); }
+      } else {
+        startSession();
+      }
+    }
+
+    function startSession() {
+      state = 'session'; session++;
+      remaining = SESSION_SECS; paused = false;
+      pomoLabel.textContent = 'Session ' + session;
+      pomoTime.textContent  = fmt(remaining);
+      setPauseIcon(false);
+      overlay.classList.add('active');
+      setRunning(true);
+      ticker = setInterval(tick, 1000);
+    }
+
+    function startBreak() {
+      state = 'break';
+      remaining = BREAK_SECS; paused = false;
+      pomoLabel.textContent = 'Break';
+      pomoTime.textContent  = fmt(remaining);
+      setPauseIcon(false);
+      ticker = setInterval(tick, 1000);
+    }
+
+    function stopAll() {
+      clearInterval(ticker); ticker = null;
+      state = 'idle'; session = 0; paused = false;
+      overlay.classList.remove('active');
+      setRunning(false);
+    }
+
+    /* Timer buttons: click to start / stop */
+    timerBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (state === 'idle') { session = 0; startSession(); }
+        else                  { stopAll(); }
+      });
+    });
+
+    /* Pause / resume */
+    pomoPause.addEventListener('click', function() {
+      if (state === 'idle') return;
+      paused = !paused;
+      if (!paused && !ticker) ticker = setInterval(tick, 1000);
+      setPauseIcon(paused);
+    });
+  })();
+
+  /* ══════════════════════════════════════
+     SOUND
+  ══════════════════════════════════════ */
+  (function initSound() {
+    var soundBtns = document.querySelectorAll('.sound-btn');
+    var activeSound = 'none';
+    var tooltip = document.getElementById('sound-tooltip');
+
+    soundBtns.forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        if (e.target.closest('.sound-option')) return;
+        e.stopPropagation();
+        var isOpen = this.classList.contains('is-open');
+        soundBtns.forEach(function(b) { b.classList.remove('is-open'); });
+        tooltip.classList.remove('visible');
+        if (!isOpen) this.classList.add('is-open');
+      });
+    });
+
+    document.addEventListener('click', function() {
+      soundBtns.forEach(function(b) { b.classList.remove('is-open'); });
+      tooltip.classList.remove('visible');
+    });
+
+    document.querySelectorAll('.sound-option').forEach(function(opt) {
+      opt.addEventListener('click', function(e) {
+        e.stopPropagation();
+        activeSound = this.dataset.sound;
+        document.querySelectorAll('.sound-option').forEach(function(o) {
+          o.classList.toggle('is-active', o.dataset.sound === activeSound);
+        });
+        // Update the default icon in every sound btn to the selected option's icon
+        var selectedImg = this.querySelector('img');
+        if (selectedImg) {
+          document.querySelectorAll('.sound-icon-default img').forEach(function(img) {
+            img.src = selectedImg.src;
+            img.alt = selectedImg.alt;
+          });
+        }
+        soundBtns.forEach(function(b) { b.classList.remove('is-open'); });
+        tooltip.classList.remove('visible');
+      });
+
+      opt.addEventListener('mouseenter', function() {
+        var btn = this.closest('.sound-btn');
+        if (!btn || !btn.classList.contains('is-open')) return;
+        var rect = this.getBoundingClientRect();
+        var btnRect = btn.getBoundingClientRect();
+        tooltip.textContent = this.dataset.tooltip;
+        tooltip.style.left = (btnRect.right + 12) + 'px';
+        tooltip.style.top  = (rect.top + rect.height / 2) + 'px';
+        tooltip.classList.add('visible');
+      });
+
+      opt.addEventListener('mouseleave', function() {
+        tooltip.classList.remove('visible');
+      });
+    });
+  })();
+
+  /* Boot */
+  renderTasks();
+</script>
+</body>
+</html>
