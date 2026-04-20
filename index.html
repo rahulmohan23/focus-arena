@@ -1512,6 +1512,27 @@
 
     playPauseBtn.addEventListener('click', togglePlay);
 
+    /* ── Keyboard shortcuts ── */
+    var _lastLeftKey = 0;
+    document.addEventListener('keydown', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        loadTrack(current + 1, playing);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        var now = Date.now();
+        var isDouble = (now - _lastLeftKey) < 300;
+        _lastLeftKey = now;
+        if (isDouble || audio.currentTime <= 5) {
+          loadTrack(current - 1, playing);
+          _lastLeftKey = 0;
+        } else {
+          audio.currentTime = 0;
+        }
+      }
+    });
+
     /* ── Start: load track 1, attempt autoplay ── */
     loadTrack(0, true);
 
