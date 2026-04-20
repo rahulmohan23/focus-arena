@@ -147,8 +147,9 @@
       gap: var(--spacing-lg);
       padding: 24px;
       backdrop-filter: blur(12px);
-      background: rgba(0, 0, 0, 0.5);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     /* Scene items inside mobile menu */
@@ -629,6 +630,10 @@
       /* Keep timer circle fixed on mobile — no hover expansion */
       .timer-btn:not(.is-running):hover .timer-default { max-width: 20px; opacity: 1; }
       .timer-btn:not(.is-running):hover .timer-hover    { max-width: 0;    opacity: 0; }
+
+      /* Scene-specific mobile framing */
+      .scene-video[data-active-scene="calm"] { object-position: 75% center; }
+      .scene-video[data-active-scene="room"] { object-position: 68% center; }
     }
 
     /* Mobile panel never shows on tablet/desktop */
@@ -879,6 +884,7 @@
   bgVideoA.load();
   bgVideoA.play().catch(function(){});
   bgVideoA.classList.add('active-video');
+  bgVideoA.dataset.activeScene = 'focus';
 
   function switchScene(sceneName) {
     if (!scenes[sceneName]) return;
@@ -892,6 +898,7 @@
     nextVid.src = scenes[sceneName];
     nextVid.load();
     nextVid.play().catch(function(){});
+    nextVid.dataset.activeScene = sceneName;
 
     /* Simultaneously fade new in and old out — no flash */
     nextVid.classList.add('active-video');
