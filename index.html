@@ -925,9 +925,10 @@
       switchScene(item.dataset.scene);
     });
 
-    /* Keyboard shortcuts: S C R F D */
+    /* Keyboard shortcuts: S C R F D — desktop + tablet only */
     var sceneKeys = { s: 'skyline', c: 'calm', r: 'room', f: 'focus', d: 'drive' };
     document.addEventListener('keydown', function(e) {
+      if (window.innerWidth <= 639) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       var scene = sceneKeys[e.key.toLowerCase()];
@@ -1521,9 +1522,10 @@
 
     playPauseBtn.addEventListener('click', togglePlay);
 
-    /* ── Keyboard shortcuts ── */
+    /* ── Keyboard shortcuts — desktop + tablet only ── */
     var _lastLeftKey = 0;
     document.addEventListener('keydown', function(e) {
+      if (window.innerWidth <= 639) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowRight') {
         e.preventDefault();
