@@ -1657,7 +1657,10 @@
     document.addEventListener('keydown', function(e) {
       if (window.innerWidth <= 639) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === 'ArrowRight') {
+      if (e.key === ' ') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         loadTrack(current + 1, playing);
       } else if (e.key === 'ArrowLeft') {
