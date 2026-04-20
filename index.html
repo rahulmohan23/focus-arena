@@ -1340,7 +1340,8 @@
       state = 'complete';
       setRunning(false);
 
-      /* Swap timer display for congratulations */
+      /* Show the overlay and swap content for congratulations */
+      overlay.classList.add('active');
       pomoLabel.textContent = '';
       pomoTime.textContent  = '';
       pomoControls.style.display = 'none';
