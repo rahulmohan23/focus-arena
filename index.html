@@ -546,6 +546,14 @@
       max-width: 0 !important; opacity: 0 !important;
     }
 
+    /* Break mode — dim and disable player + sound controls */
+    .break-mode .player,
+    .break-mode .sound-btn {
+      pointer-events: none;
+      opacity: 0.35;
+      transition: opacity 0.4s ease;
+    }
+
     /* ══════════════════════════════════
        MOBILE  ≤ 639px
     ══════════════════════════════════ */
@@ -1081,6 +1089,11 @@
     var pomoPause  = document.getElementById('pomo-pause-btn');
     var pomoExit   = document.getElementById('pomo-exit-btn');
     var timerBtns  = document.querySelectorAll('.timer-btn');
+    var app        = document.getElementById('app');
+
+    var breakAudio = new Audio('White noise/Break.mp3');
+    breakAudio.loop   = true;
+    breakAudio.volume = 0.7;
 
     var state     = 'idle';
     var session   = 0;
@@ -1117,6 +1130,12 @@
     }
 
     function startSession() {
+      /* Stop break audio and restore music/sound when resuming from break */
+      breakAudio.pause();
+      breakAudio.currentTime = 0;
+      if (window._resumeMusicAfterBreak) window._resumeMusicAfterBreak();
+      if (window._resumeSoundAfterBreak) window._resumeSoundAfterBreak();
+      app.classList.remove('break-mode');
       state = 'session'; session++;
       remaining = SESSION_SECS; paused = false;
       pomoLabel.textContent = 'Session ' + session;
@@ -1133,11 +1152,23 @@
       pomoLabel.textContent = 'Break';
       pomoTime.textContent  = fmt(remaining);
       setPauseIcon(false);
+      /* Pause lo-fi and white noise, play break track, lock controls */
+      if (window._pauseMusicForBreak) window._pauseMusicForBreak();
+      if (window._pauseSoundForBreak) window._pauseSoundForBreak();
+      breakAudio.currentTime = 0;
+      breakAudio.play().catch(function() {});
+      app.classList.add('break-mode');
       ticker = setInterval(tick, 1000);
     }
 
     function stopAll() {
       clearInterval(ticker); ticker = null;
+      /* Stop break audio and restore music/sound */
+      breakAudio.pause();
+      breakAudio.currentTime = 0;
+      if (window._resumeMusicAfterBreak) window._resumeMusicAfterBreak();
+      if (window._resumeSoundAfterBreak) window._resumeSoundAfterBreak();
+      app.classList.remove('break-mode');
       state = 'idle'; session = 0; paused = false;
       overlay.classList.remove('active');
       setRunning(false);
@@ -1264,6 +1295,19 @@
         tooltip.classList.remove('visible');
       });
     });
+
+    /* Expose pause/resume for break coordination */
+    var _soundWasPlaying = false;
+    window._pauseSoundForBreak = function() {
+      _soundWasPlaying = !noiseAudio.paused && !!noiseAudio.src;
+      if (_soundWasPlaying) noiseAudio.pause();
+    };
+    window._resumeSoundAfterBreak = function() {
+      if (_soundWasPlaying) {
+        noiseAudio.play().catch(function() {});
+        _soundWasPlaying = false;
+      }
+    };
   })();
 
   /* ══════════════════════════════════════
@@ -1362,6 +1406,22 @@
 
     /* ── Start: load track 1, attempt autoplay ── */
     loadTrack(0, true);
+
+    /* Expose pause/resume for break coordination */
+    var _musicWasPlaying = false;
+    window._pauseMusicForBreak = function() {
+      _musicWasPlaying = playing;
+      if (playing) { audio.pause(); playing = false; setPlayIcon(false); }
+    };
+    window._resumeMusicAfterBreak = function() {
+      if (_musicWasPlaying) {
+        audio.play().then(function() {
+          playing = true;
+          setPlayIcon(true);
+        }).catch(function() {});
+        _musicWasPlaying = false;
+      }
+    };
   })();
 
   /* Boot */
