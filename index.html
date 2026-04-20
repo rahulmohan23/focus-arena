@@ -794,19 +794,19 @@
           <img src="icon/sound.png" width="20" height="20" alt="Sound">
         </div>
         <div class="sound-options">
-          <button class="sound-option is-active" data-sound="none" title="No Sound">
+          <button class="sound-option is-active" data-sound="none" data-tooltip="No Sound">
             <img src="icon/no sound.png" width="20" height="20" alt="No Sound">
           </button>
-          <button class="sound-option" data-sound="campfire" title="Campfire">
+          <button class="sound-option" data-sound="campfire" data-tooltip="Campfire">
             <img src="icon/campfire.png" width="20" height="20" alt="Campfire">
           </button>
-          <button class="sound-option" data-sound="nature" title="Nature">
+          <button class="sound-option" data-sound="nature" data-tooltip="Nature">
             <img src="icon/nature.png" width="20" height="20" alt="Nature">
           </button>
-          <button class="sound-option" data-sound="waves" title="Waves">
+          <button class="sound-option" data-sound="waves" data-tooltip="Waves">
             <img src="icon/waves.png" width="20" height="20" alt="Waves">
           </button>
-          <button class="sound-option" data-sound="forest" title="Forest">
+          <button class="sound-option" data-sound="forest" data-tooltip="Forest">
             <img src="icon/forest.png" width="20" height="20" alt="Forest">
           </button>
         </div>
@@ -854,6 +854,7 @@
     /* Toggle on button click */
     menuBtn.addEventListener('click', function(e) {
       e.stopPropagation();
+      document.querySelectorAll('.sound-btn').forEach(function(b) { b.classList.remove('is-open'); });
       setMenuOpen(!menuOpen);
     });
 
@@ -869,70 +870,81 @@
   })();
 
   /* ── Scene switching (works for both desktop nav + mobile accordion) ── */
-  const scenes = {
-    skyline: 'Background videos/scenes=skyline.mp4',
-    calm:    'Background videos/scenes=calm.mp4',
-    room:    'Background videos/scenes=room.mp4',
-    focus:   'Background videos/scenes=focus.mp4',
-    drive:   'Background videos/scenes=drive.mp4',
-  };
+  (function initScenes() {
+    var scenes = {
+      skyline: 'Background videos/scenes=skyline.mp4',
+      calm:    'Background videos/scenes=calm.mp4',
+      room:    'Background videos/scenes=room.mp4',
+      focus:   'Background videos/scenes=focus.mp4',
+      drive:   'Background videos/scenes=drive.mp4',
+    };
 
-  var bgVideoA  = document.getElementById('scene-video-a');
-  var bgVideoB  = document.getElementById('scene-video-b');
-  var activeVid = bgVideoA;
+    var bgVideoA  = document.getElementById('scene-video-a');
+    var bgVideoB  = document.getElementById('scene-video-b');
+    var activeVid = bgVideoA;
 
-  /* Boot: load default focus scene into video A */
-  bgVideoA.src = scenes.focus;
-  bgVideoA.load();
-  bgVideoA.play().catch(function(){});
-  bgVideoA.classList.add('active-video');
-  bgVideoA.dataset.activeScene = 'focus';
+    /* Boot: load default focus scene into video A */
+    bgVideoA.src = scenes.focus;
+    bgVideoA.load();
+    bgVideoA.play().catch(function(){});
+    bgVideoA.classList.add('active-video');
+    bgVideoA.dataset.activeScene = 'focus';
 
-  function switchScene(sceneName) {
-    if (!scenes[sceneName]) return;
+    function switchScene(sceneName) {
+      if (!scenes[sceneName]) return;
 
-    document.querySelectorAll('[data-scene]').forEach(function(el) {
-      el.classList.toggle('active', el.dataset.scene === sceneName);
+      document.querySelectorAll('[data-scene]').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.scene === sceneName);
+      });
+
+      /* Load new scene into the inactive video element */
+      var nextVid = activeVid === bgVideoA ? bgVideoB : bgVideoA;
+      nextVid.src = scenes[sceneName];
+      nextVid.load();
+      nextVid.play().catch(function(){});
+      nextVid.dataset.activeScene = sceneName;
+
+      /* Simultaneously fade new in and old out — no flash */
+      nextVid.classList.add('active-video');
+      activeVid.classList.remove('active-video');
+      activeVid.removeAttribute('data-active-scene');
+      activeVid = nextVid;
+    }
+
+    /* Desktop scene-nav */
+    document.querySelector('.scene-nav').addEventListener('click', function(e) {
+      var item = e.target.closest('[data-scene]');
+      if (!item || item.classList.contains('active')) return;
+      switchScene(item.dataset.scene);
     });
 
-    /* Load new scene into the inactive video element */
-    var nextVid = activeVid === bgVideoA ? bgVideoB : bgVideoA;
-    nextVid.src = scenes[sceneName];
-    nextVid.load();
-    nextVid.play().catch(function(){});
-    nextVid.dataset.activeScene = sceneName;
-
-    /* Simultaneously fade new in and old out — no flash */
-    nextVid.classList.add('active-video');
-    activeVid.classList.remove('active-video');
-    activeVid = nextVid;
-  }
-
-  /* Desktop scene-nav */
-  document.querySelector('.scene-nav').addEventListener('click', function(e) {
-    const item = e.target.closest('[data-scene]');
-    if (!item || item.classList.contains('active')) return;
-    switchScene(item.dataset.scene);
-  });
-
-  /* Mobile scene panel — switch scene on tap */
-  document.getElementById('mobile-menu').addEventListener('click', function(e) {
-    const item = e.target.closest('[data-scene]');
-    if (!item || item.classList.contains('active')) return;
-    switchScene(item.dataset.scene);
-  });
+    /* Mobile scene panel — switch scene on tap */
+    document.getElementById('mobile-menu').addEventListener('click', function(e) {
+      var item = e.target.closest('[data-scene]');
+      if (!item || item.classList.contains('active')) return;
+      switchScene(item.dataset.scene);
+    });
+  })();
 
   /* ══════════════════════════════════════
      STICKY NOTE
   ══════════════════════════════════════ */
+  (function initSticky() {
   const CHECKMARK_SVG = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5L3.8 6.5L9 1" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  let tasks = [
-    { id: 1, text: 'Finish the pitch deck research', state: 'added' },
-    { id: 2, text: 'Set user interview',             state: 'checked' },
-  ];
-  let nextId = 3;
+  let tasks = (function() {
+    try { var s = JSON.parse(localStorage.getItem('ff_tasks')); if (Array.isArray(s) && s.length) return s; } catch(e) {}
+    return [
+      { id: 1, text: 'Finish the pitch deck research', state: 'added' },
+      { id: 2, text: 'Set user interview',             state: 'checked' },
+    ];
+  })();
+  let nextId = tasks.length ? Math.max.apply(null, tasks.map(function(t){ return t.id; })) + 1 : 1;
   let editingId = null; /* null means not editing; 0 means the "add" row */
+
+  function saveTasks() {
+    try { localStorage.setItem('ff_tasks', JSON.stringify(tasks)); } catch(e) {}
+  }
 
   /* ── Render ── */
   function renderTasks() {
@@ -954,6 +966,7 @@
         const input = makeInput(task.text, val => {
           if (val.trim()) task.text = val.trim();
           editingId = null;
+          saveTasks();
           renderTasks();
         });
         row.appendChild(cb);
@@ -968,6 +981,12 @@
       label.className = 'task-label' + (task.state === 'checked' ? ' done' : '');
       label.textContent = task.text;
       label.addEventListener('dblclick', () => { editingId = task.id; renderTasks(); });
+      let _lastTap = 0;
+      label.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - _lastTap < 300) { e.preventDefault(); editingId = task.id; renderTasks(); }
+        _lastTap = now;
+      });
 
       /* Delete button */
       const del = document.createElement('button');
@@ -978,6 +997,7 @@
         row.classList.add('task-removing');
         setTimeout(() => {
           tasks = tasks.filter(t => t.id !== task.id);
+          saveTasks();
           renderTasks();
         }, 300);
       });
@@ -999,6 +1019,7 @@
       const input = makeInput('', val => {
         if (val.trim()) tasks.push({ id: nextId++, text: val.trim(), state: 'added' });
         editingId = null;
+        saveTasks();
         renderTasks();
       });
       addRow.appendChild(addCb);
@@ -1041,6 +1062,7 @@
     });
     ta.addEventListener('blur', commit);
     ta.addEventListener('mousedown', e => e.stopPropagation());
+    ta.addEventListener('touchstart', e => e.stopPropagation());
     return ta;
   }
 
@@ -1048,6 +1070,7 @@
     const t = tasks.find(t => t.id === id);
     if (!t) return;
     t.state = t.state === 'checked' ? 'added' : 'checked';
+    saveTasks();
     renderTasks();
   }
 
@@ -1110,7 +1133,7 @@
 
     /* Touch */
     sticky.addEventListener('touchstart', e => {
-      if (e.target.closest('.checkbox') || e.target.closest('input') || e.target.closest('.task-delete')) return;
+      if (e.target.closest('.checkbox') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.task-delete')) return;
       const t = e.touches[0];
       onStart(t.clientX, t.clientY);
     }, { passive: true });
@@ -1147,6 +1170,9 @@
     sticky.style.left = Math.round((window.innerWidth - sticky.offsetWidth) / 2) + 'px';
     sticky.style.top  = '103px';
   }
+
+  renderTasks();
+  })(); /* end initSticky */
 
   /* ══════════════════════════════════════
      POMODORO
@@ -1255,8 +1281,10 @@
           startSession();
         } else {
           stopAll();
-          /* Suppress hover expansion until cursor leaves the button */
           timerBtns.forEach(function(b) { b.classList.add('no-hover'); });
+          if ('ontouchstart' in window) {
+            setTimeout(function() { timerBtns.forEach(function(b) { b.classList.remove('no-hover'); }); }, 50);
+          }
         }
       });
 
@@ -1270,12 +1298,19 @@
     pomoExit.addEventListener('click', function() {
       stopAll();
       timerBtns.forEach(function(b) { b.classList.add('no-hover'); });
+      if ('ontouchstart' in window) {
+        setTimeout(function() { timerBtns.forEach(function(b) { b.classList.remove('no-hover'); }); }, 50);
+      }
     });
 
     /* Pause / resume */
     pomoPause.addEventListener('click', function() {
       if (state === 'idle') return;
       paused = !paused;
+      if (state === 'break') {
+        if (paused) breakAudio.pause();
+        else breakAudio.play().catch(function() {});
+      }
       if (!paused && !ticker) ticker = setInterval(tick, 1000);
       setPauseIcon(paused);
     });
@@ -1497,8 +1532,7 @@
     };
   })();
 
-  /* Boot */
-  renderTasks();
+
 </script>
 </body>
 </html>
