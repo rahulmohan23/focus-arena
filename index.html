@@ -52,13 +52,8 @@
       display: block;
       transition: opacity 0.6s ease;
     }
-    .scene-bg.fading { opacity: 0; }
-
-    /* Video layer sits on top; fades in/out over the image */
-    .scene-video {
-      z-index: 1;
-      opacity: 0;
-    }
+    /* Both video layers start hidden; active-video fades one in */
+    .scene-video { opacity: 0; }
     .scene-video.active-video { opacity: 1; }
 
     /* ══════════════════════════════════
@@ -613,10 +608,9 @@
 <body>
 <div id="app">
 
-  <!-- Background image (fallback layer) -->
-  <img class="scene-bg" id="scene-img" src="Screens/Backgorund/scenes=focus.jpg" alt="Background" />
-  <!-- Background video (top layer for video scenes) -->
-  <video class="scene-bg scene-video" id="scene-video" loop muted playsinline></video>
+  <!-- Two video layers for seamless A/B crossfade (no flash between scenes) -->
+  <video class="scene-bg scene-video" id="scene-video-a" loop muted playsinline></video>
+  <video class="scene-bg scene-video" id="scene-video-b" loop muted playsinline></video>
 
   <!-- Header -->
   <header class="header" id="header">
@@ -837,53 +831,40 @@
 
   /* ── Scene switching (works for both desktop nav + mobile accordion) ── */
   const scenes = {
-    skyline: { type: 'video', src: 'Background videos/scenes=skyline.mp4' },
-    calm:    { type: 'video', src: 'Background videos/scenes=calm.mp4'    },
-    room:    { type: 'video', src: 'Background videos/scenes=room.mp4'    },
-    focus:   { type: 'video', src: 'Background videos/scenes=focus.mp4'   },
-    drive:   { type: 'video', src: 'Background videos/scenes=drive.mp4'   },
+    skyline: 'Background videos/scenes=skyline.mp4',
+    calm:    'Background videos/scenes=calm.mp4',
+    room:    'Background videos/scenes=room.mp4',
+    focus:   'Background videos/scenes=focus.mp4',
+    drive:   'Background videos/scenes=drive.mp4',
   };
-  const bgImg   = document.getElementById('scene-img');
-  const bgVideo = document.getElementById('scene-video');
 
-  /* Boot: load the default focus video */
-  bgVideo.src = scenes.focus.src;
-  bgVideo.load();
-  bgVideo.play().catch(function(){});
-  bgVideo.classList.add('active-video');
+  var bgVideoA  = document.getElementById('scene-video-a');
+  var bgVideoB  = document.getElementById('scene-video-b');
+  var activeVid = bgVideoA;
+
+  /* Boot: load default focus scene into video A */
+  bgVideoA.src = scenes.focus;
+  bgVideoA.load();
+  bgVideoA.play().catch(function(){});
+  bgVideoA.classList.add('active-video');
 
   function switchScene(sceneName) {
-    var scene = scenes[sceneName];
-    if (!scene) return;
+    if (!scenes[sceneName]) return;
 
     document.querySelectorAll('[data-scene]').forEach(function(el) {
       el.classList.toggle('active', el.dataset.scene === sceneName);
     });
 
-    if (scene.type === 'video') {
-      /* Fade video out, swap source, fade back in */
-      bgVideo.classList.remove('active-video');
-      setTimeout(function() {
-        bgVideo.src = scene.src;
-        bgVideo.load();
-        bgVideo.play().catch(function(){});
-        bgVideo.classList.add('active-video');
-      }, 400);
-    } else {
-      if (bgVideo.classList.contains('active-video')) {
-        /* From video → image: load image underneath, then fade out video */
-        bgImg.src = scene.src;
-        bgVideo.classList.remove('active-video');
-      } else {
-        /* From image → image: crossfade the image layer */
-        bgImg.classList.add('fading');
-        setTimeout(function() {
-          bgImg.src = scene.src;
-          bgImg.onload = function() { bgImg.classList.remove('fading'); };
-          if (bgImg.complete) bgImg.classList.remove('fading');
-        }, 300);
-      }
-    }
+    /* Load new scene into the inactive video element */
+    var nextVid = activeVid === bgVideoA ? bgVideoB : bgVideoA;
+    nextVid.src = scenes[sceneName];
+    nextVid.load();
+    nextVid.play().catch(function(){});
+
+    /* Simultaneously fade new in and old out — no flash */
+    nextVid.classList.add('active-video');
+    activeVid.classList.remove('active-video');
+    activeVid = nextVid;
   }
 
   /* Desktop scene-nav */
