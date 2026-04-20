@@ -356,6 +356,18 @@
     .task-row:hover .task-delete { opacity: 0.4; }
     .task-delete:hover { opacity: 1 !important; }
 
+    /* Swoosh-out animation when a task is deleted */
+    @keyframes task-swoosh-out {
+      0%   { opacity: 1; transform: translateX(0);     max-height: 60px; margin-bottom: 0; }
+      55%  { opacity: 0; transform: translateX(-110%); max-height: 60px; margin-bottom: 0; }
+      100% { opacity: 0; transform: translateX(-110%); max-height: 0;    margin-bottom: -8px; }
+    }
+    .task-removing {
+      animation: task-swoosh-out 0.32s ease forwards;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
     /* Checkbox */
     .checkbox {
       flex-shrink: 0;
@@ -954,8 +966,11 @@
       del.title = 'Delete task';
       del.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="#313131" stroke-width="1.5" stroke-linecap="round"/></svg>`;
       del.addEventListener('click', () => {
-        tasks = tasks.filter(t => t.id !== task.id);
-        renderTasks();
+        row.classList.add('task-removing');
+        setTimeout(() => {
+          tasks = tasks.filter(t => t.id !== task.id);
+          renderTasks();
+        }, 300);
       });
 
       row.appendChild(cb);
