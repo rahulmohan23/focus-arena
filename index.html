@@ -200,12 +200,15 @@
     }
     .icon-btn:hover { background: rgba(255, 255, 255, 0.1); }
 
-    /* Sound button — 46×46 circle, reveals upward on click */
+    /* Timer button — 52×52 circle, matches player height */
+    .timer-btn { padding: 16px; }
+
+    /* Sound button — 52×52 circle, reveals upward on click */
     .sound-btn {
       flex-direction: column-reverse; /* icon at bottom, options grow upward */
       gap: 0;
-      padding: 13px;
-      width: 46px;
+      padding: 16px;
+      width: 52px;
       cursor: pointer;
     }
 
@@ -525,8 +528,21 @@
       white-space: nowrap;
     }
 
-    .pomo-pause-btn {
+    /* Overlay control row — pause + exit */
+    .pomo-controls {
+      display: flex;
+      gap: var(--spacing-m);
       pointer-events: all;
+    }
+
+    .pomo-pause-btn, .pomo-exit-btn { pointer-events: all; }
+
+    /* Suppress hover expansion immediately after stopping */
+    .timer-btn.no-hover:not(.is-running):hover .timer-default {
+      max-width: 20px !important; opacity: 1 !important;
+    }
+    .timer-btn.no-hover:not(.is-running):hover .timer-hover {
+      max-width: 0 !important; opacity: 0 !important;
     }
 
     /* ══════════════════════════════════
@@ -564,8 +580,12 @@
       /* Hide individual icon-btns from top row — moved into row2 */
       .controls > .icon-btn { display: none; }
 
-      /* Show the combined timer+sound row */
-      .controls-row2 { display: flex; }
+      /* Show the combined timer+sound row above the player */
+      .controls-row2 { display: flex; order: -1; }
+
+      /* Keep timer circle fixed on mobile — no hover expansion */
+      .timer-btn:not(.is-running):hover .timer-default { max-width: 20px; opacity: 1; }
+      .timer-btn:not(.is-running):hover .timer-hover    { max-width: 0;    opacity: 0; }
     }
 
     /* Mobile panel never shows on tablet/desktop */
@@ -651,23 +671,28 @@
 
     <!-- Player -->
     <div class="player">
-      <button class="player-btn" title="Previous">
+      <button class="player-btn" id="prev-btn" title="Previous">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path d="M5 4.5V15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
           <path d="M15.5 4.5L7 10L15.5 15.5V4.5Z" fill="white"/>
         </svg>
       </button>
 
-      <span class="track-name">Lo Fi Music 1</span>
+      <span class="track-name" id="track-name">Lo Fi 01</span>
 
-      <button class="player-btn" title="Pause">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <button class="player-btn" id="play-pause-btn" title="Play/Pause">
+        <!-- pause bars (playing state) -->
+        <svg id="icon-pause" width="20" height="20" viewBox="0 0 20 20" fill="none">
           <rect x="5"    y="4" width="3.5" height="12" rx="1" fill="white"/>
           <rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/>
         </svg>
+        <!-- play triangle (paused state) -->
+        <svg id="icon-play" width="20" height="20" viewBox="0 0 20 20" fill="none" style="display:none">
+          <path d="M6 4.5L16 10L6 15.5V4.5Z" fill="white"/>
+        </svg>
       </button>
 
-      <button class="player-btn" title="Next">
+      <button class="player-btn" id="next-btn" title="Next">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path d="M15 4.5V15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
           <path d="M4.5 4.5L13 10L4.5 15.5V4.5Z" fill="white"/>
@@ -746,9 +771,16 @@
   <div id="pomodoro-overlay">
     <div class="pomo-label" id="pomo-label">Session 1</div>
     <div class="pomo-time"  id="pomo-time">20:00</div>
-    <button class="icon-btn pomo-pause-btn" id="pomo-pause-btn" title="Pause">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="white"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/></svg>
-    </button>
+    <div class="pomo-controls">
+      <button class="icon-btn pomo-pause-btn" id="pomo-pause-btn" title="Pause">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="white"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/></svg>
+      </button>
+      <button class="icon-btn pomo-exit-btn" id="pomo-exit-btn" title="Exit">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M5 5L15 15M15 5L5 15" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
 </div>
@@ -1046,6 +1078,7 @@
     var pomoLabel  = document.getElementById('pomo-label');
     var pomoTime   = document.getElementById('pomo-time');
     var pomoPause  = document.getElementById('pomo-pause-btn');
+    var pomoExit   = document.getElementById('pomo-exit-btn');
     var timerBtns  = document.querySelectorAll('.timer-btn');
 
     var state     = 'idle';
@@ -1112,9 +1145,26 @@
     /* Timer buttons: click to start / stop */
     timerBtns.forEach(function(btn) {
       btn.addEventListener('click', function() {
-        if (state === 'idle') { session = 0; startSession(); }
-        else                  { stopAll(); }
+        if (state === 'idle') {
+          session = 0;
+          startSession();
+        } else {
+          stopAll();
+          /* Suppress hover expansion until cursor leaves the button */
+          timerBtns.forEach(function(b) { b.classList.add('no-hover'); });
+        }
       });
+
+      /* Re-enable hover once the cursor leaves */
+      btn.addEventListener('mouseleave', function() {
+        this.classList.remove('no-hover');
+      });
+    });
+
+    /* Exit button inside overlay */
+    pomoExit.addEventListener('click', function() {
+      stopAll();
+      timerBtns.forEach(function(b) { b.classList.add('no-hover'); });
     });
 
     /* Pause / resume */
@@ -1133,6 +1183,35 @@
     var soundBtns = document.querySelectorAll('.sound-btn');
     var activeSound = 'none';
     var tooltip = document.getElementById('sound-tooltip');
+
+    var SOUND_FILES = {
+      campfire: 'White noise/Campfire.mp3',
+      nature:   'White noise/Nature.mp3',
+      waves:    'White noise/Waves.mp3',
+      forest:   'White noise/Forest.mp3',
+    };
+
+    var noiseAudio = new Audio();
+    noiseAudio.loop = true;
+    noiseAudio.volume = 0.6;
+
+    function playSound(sound) {
+      noiseAudio.pause();
+      if (sound === 'none') {
+        noiseAudio.src = '';
+        return;
+      }
+      var src = SOUND_FILES[sound];
+      if (!src) return;
+      noiseAudio.src = src;
+      noiseAudio.load();
+      noiseAudio.play().catch(function() {});
+    }
+
+    /* Fallback: if loop flag is ignored by the browser, restart manually */
+    noiseAudio.addEventListener('ended', function() {
+      if (noiseAudio.src) noiseAudio.play().catch(function() {});
+    });
 
     soundBtns.forEach(function(btn) {
       btn.addEventListener('click', function(e) {
@@ -1157,7 +1236,6 @@
         document.querySelectorAll('.sound-option').forEach(function(o) {
           o.classList.toggle('is-active', o.dataset.sound === activeSound);
         });
-        // Update the default icon in every sound btn to the selected option's icon
         var selectedImg = this.querySelector('img');
         if (selectedImg) {
           document.querySelectorAll('.sound-icon-default img').forEach(function(img) {
@@ -1165,6 +1243,7 @@
             img.alt = selectedImg.alt;
           });
         }
+        playSound(activeSound);
         soundBtns.forEach(function(b) { b.classList.remove('is-open'); });
         tooltip.classList.remove('visible');
       });
@@ -1184,6 +1263,101 @@
         tooltip.classList.remove('visible');
       });
     });
+  })();
+
+  /* ══════════════════════════════════════
+     MUSIC PLAYER
+     ─────────────────────────────────────
+     To add tracks: drop an MP3 into
+     "Lo fi music/" and add an entry below.
+  ══════════════════════════════════════ */
+  (function initPlayer() {
+    var PLAYLIST = [
+      { name: 'Lo Fi 01', src: 'Lo fi music/Focus flow 01.mp3' },
+      { name: 'Lo Fi 02', src: 'Lo fi music/Focus flow 02.mp3' },
+      { name: 'Lo Fi 03', src: 'Lo fi music/Focus flow 03.mp3' },
+      { name: 'Lo Fi 04', src: 'Lo fi music/Focus flow 04.mp3' },
+      { name: 'Lo Fi 05', src: 'Lo fi music/Focus flow 05.mp3' },
+      { name: 'Lo Fi 06', src: 'Lo fi music/Focus flow 06.mp3' },
+      { name: 'Lo Fi 07', src: 'Lo fi music/Focus flow 07.mp3' },
+      { name: 'Lo Fi 08', src: 'Lo fi music/Focus flow 08.mp3' },
+      { name: 'Lo Fi 09', src: 'Lo fi music/Focus flow 09.mp3' },
+      { name: 'Lo Fi 10', src: 'Lo fi music/Focus flow 10.mp3' },
+    ];
+
+    var audio       = new Audio();
+    audio.volume    = 0.8;
+    var current     = 0;
+    var playing     = false;
+
+    /* ── DOM refs ── */
+    var trackName    = document.getElementById('track-name');
+    var prevBtn      = document.getElementById('prev-btn');
+    var nextBtn      = document.getElementById('next-btn');
+    var playPauseBtn = document.getElementById('play-pause-btn');
+    var iconPause    = document.getElementById('icon-pause');
+    var iconPlay     = document.getElementById('icon-play');
+
+    /* ── Helpers ── */
+    function setPlayIcon(isPlaying) {
+      iconPause.style.display = isPlaying ? 'block' : 'none';
+      iconPlay.style.display  = isPlaying ? 'none'  : 'block';
+    }
+
+    function loadTrack(index, autoPlay) {
+      current = ((index % PLAYLIST.length) + PLAYLIST.length) % PLAYLIST.length;
+      audio.src = PLAYLIST[current].src;
+      trackName.textContent = PLAYLIST[current].name;
+      if (autoPlay) {
+        audio.play().then(function() {
+          playing = true;
+          setPlayIcon(true);
+        }).catch(function() {
+          playing = false;
+          setPlayIcon(false);
+        });
+      } else {
+        setPlayIcon(false);
+      }
+    }
+
+    function togglePlay() {
+      if (playing) {
+        audio.pause();
+        playing = false;
+        setPlayIcon(false);
+      } else {
+        audio.play().then(function() {
+          playing = true;
+          setPlayIcon(true);
+        });
+      }
+    }
+
+    /* ── Auto-advance when track ends ── */
+    audio.addEventListener('ended', function() {
+      loadTrack(current + 1, true);
+    });
+
+    /* ── Controls ── */
+    prevBtn.addEventListener('click', function() {
+      /* Restart if >3 s in, else go to previous */
+      if (audio.currentTime > 3) {
+        audio.currentTime = 0;
+        if (!playing) togglePlay();
+      } else {
+        loadTrack(current - 1, playing);
+      }
+    });
+
+    nextBtn.addEventListener('click', function() {
+      loadTrack(current + 1, playing);
+    });
+
+    playPauseBtn.addEventListener('click', togglePlay);
+
+    /* ── Start: load track 1, attempt autoplay ── */
+    loadTrack(0, true);
   })();
 
   /* Boot */
