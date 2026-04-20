@@ -573,6 +573,38 @@
 
     .pomo-pause-btn, .pomo-exit-btn { pointer-events: all; }
 
+    /* Congratulations message */
+    .pomo-congrats {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--spacing-lg);
+      pointer-events: none;
+    }
+    .pomo-congrats.visible { display: flex; }
+    .pomo-congrats-title {
+      font-family: var(--font-doto);
+      font-weight: 600;
+      font-size: 24px;
+      color: white;
+      white-space: nowrap;
+    }
+    .pomo-congrats-msg {
+      font-family: var(--font-doto);
+      font-weight: 400;
+      font-size: 16px;
+      color: rgba(255,255,255,0.75);
+      text-align: center;
+      max-width: 320px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    /* Scrambling characters glow */
+    .pomo-scrambling {
+      color: rgba(255,255,255,0.5);
+      text-shadow: 0 0 8px rgba(255,255,255,0.4);
+    }
+
     /* Suppress hover expansion immediately after stopping */
     .timer-btn.no-hover:not(.is-running):hover .timer-default {
       max-width: 20px !important; opacity: 1 !important;
@@ -822,7 +854,7 @@
   <div id="pomodoro-overlay">
     <div class="pomo-label" id="pomo-label">Session 1</div>
     <div class="pomo-time"  id="pomo-time">20:00</div>
-    <div class="pomo-controls">
+    <div class="pomo-controls" id="pomo-controls">
       <button class="icon-btn pomo-pause-btn" id="pomo-pause-btn" title="Pause">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="white"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="white"/></svg>
       </button>
@@ -831,6 +863,10 @@
           <path d="M5 5L15 15M15 5L5 15" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
+    </div>
+    <div class="pomo-congrats" id="pomo-congrats">
+      <div class="pomo-congrats-title" id="pomo-congrats-title">Congratulations</div>
+      <div class="pomo-congrats-msg" id="pomo-congrats-msg">You have successfully completed&#10;your Pomodoro session.</div>
     </div>
   </div>
 
@@ -1192,23 +1228,85 @@
     var SESSION_SECS = 20 * 60;
     var BREAK_SECS   =  5 * 60;
 
-    var overlay    = document.getElementById('pomodoro-overlay');
-    var pomoLabel  = document.getElementById('pomo-label');
-    var pomoTime   = document.getElementById('pomo-time');
-    var pomoPause  = document.getElementById('pomo-pause-btn');
-    var pomoExit   = document.getElementById('pomo-exit-btn');
-    var timerBtns  = document.querySelectorAll('.timer-btn');
-    var app        = document.getElementById('app');
+    var overlay       = document.getElementById('pomodoro-overlay');
+    var pomoLabel     = document.getElementById('pomo-label');
+    var pomoTime      = document.getElementById('pomo-time');
+    var pomoPause     = document.getElementById('pomo-pause-btn');
+    var pomoExit      = document.getElementById('pomo-exit-btn');
+    var pomoControls  = document.getElementById('pomo-controls');
+    var congratsEl    = document.getElementById('pomo-congrats');
+    var congratsTitle = document.getElementById('pomo-congrats-title');
+    var congratsMsg   = document.getElementById('pomo-congrats-msg');
+    var timerBtns     = document.querySelectorAll('.timer-btn');
+    var app           = document.getElementById('app');
 
     var breakAudio = new Audio('White noise/Break.mp3');
     breakAudio.loop   = true;
     breakAudio.volume = 0.7;
 
-    var state     = 'idle';
-    var session   = 0;
-    var remaining = 0;
-    var paused    = false;
-    var ticker    = null;
+    var state             = 'idle';
+    var session           = 0;
+    var remaining         = 0;
+    var paused            = false;
+    var ticker            = null;
+    var completionTimeout = null;
+
+    /* ── Encrypted-text disappear animation ── */
+    function encryptedDisappear(elements, onComplete) {
+      var CHARSET = '!<>-_\\/[]{}=+*^?#@$%&ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      var WAVE    = 1400;  /* ms for wave to sweep all chars */
+      var SCRAMBLE = 280;  /* ms each char scrambles before vanishing */
+
+      /* Map each element's characters to a global start time within the wave */
+      var totalVisible = 0;
+      elements.forEach(function(el) {
+        el.textContent.split('').forEach(function(c) { if (c.trim()) totalVisible++; });
+      });
+
+      var charIdx = 0;
+      var maps = elements.map(function(el) {
+        return el.textContent.split('').map(function(c) {
+          if (!c.trim()) return -1; /* spaces/newlines: no animation */
+          return (charIdx++ / (totalVisible || 1)) * WAVE;
+        });
+      });
+
+      var startTime = null;
+
+      function frame(ts) {
+        if (!startTime) startTime = ts;
+        var elapsed = ts - startTime;
+        var allDone = true;
+
+        elements.forEach(function(el, ei) {
+          var chars = el.textContent; /* current displayed chars (may include newlines) */
+          var origChars = maps[ei]; /* timing map — same length as original */
+          var src = el.getAttribute('data-orig') || el.textContent;
+          if (!el.getAttribute('data-orig')) el.setAttribute('data-orig', src);
+          src = el.getAttribute('data-orig');
+
+          var display = src.split('').map(function(ch, i) {
+            var t = origChars[i];
+            if (t === -1) return ch; /* preserve spaces/newlines */
+            var ce = elapsed - t;
+            if (ce < 0)            { allDone = false; return ch; }
+            if (ce < SCRAMBLE)     { allDone = false; return CHARSET[Math.floor(Math.random() * CHARSET.length)]; }
+            return '\u00A0'; /* vanished */
+          }).join('');
+
+          el.textContent = display;
+        });
+
+        if (!allDone && elapsed < WAVE + SCRAMBLE + 200) {
+          requestAnimationFrame(frame);
+        } else {
+          elements.forEach(function(el) { el.removeAttribute('data-orig'); el.textContent = ''; });
+          if (onComplete) onComplete();
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
 
     function fmt(secs) {
       var m = Math.floor(secs / 60), s = secs % 60;
@@ -1232,10 +1330,35 @@
       if (remaining > 0) return;
       clearInterval(ticker); ticker = null;
       if (state === 'session') {
-        if (session < SESSIONS) { startBreak(); } else { stopAll(); }
+        if (session < SESSIONS) { startBreak(); } else { showCompletion(); }
       } else {
         startSession();
       }
+    }
+
+    function showCompletion() {
+      state = 'complete';
+      setRunning(false);
+
+      /* Swap timer display for congratulations */
+      pomoLabel.textContent = '';
+      pomoTime.textContent  = '';
+      pomoControls.style.display = 'none';
+      congratsEl.classList.add('visible');
+
+      /* Reset congrats text (in case a previous animation cleared it) */
+      congratsTitle.textContent = 'Congratulations';
+      congratsMsg.textContent   = 'You have successfully completed\nyour Pomodoro session.';
+
+      /* After 2.5 s, encrypt-dissolve the message then fully reset */
+      completionTimeout = setTimeout(function() {
+        completionTimeout = null;
+        encryptedDisappear([congratsTitle, congratsMsg], function() {
+          congratsEl.classList.remove('visible');
+          pomoControls.style.display = '';
+          stopAll();
+        });
+      }, 2500);
     }
 
     function startSession() {
@@ -1272,16 +1395,22 @@
 
     function stopAll() {
       clearInterval(ticker); ticker = null;
-      /* Stop break audio and restore music/sound */
+      if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
       breakAudio.pause();
       breakAudio.currentTime = 0;
       if (window._resumeMusicAfterBreak) window._resumeMusicAfterBreak();
       if (window._resumeSoundAfterBreak) window._resumeSoundAfterBreak();
       app.classList.remove('break-mode');
+      /* Clean up completion UI if it was showing */
+      congratsEl.classList.remove('visible');
+      pomoControls.style.display = '';
       state = 'idle'; session = 0; paused = false;
       overlay.classList.remove('active');
       setRunning(false);
     }
+
+    /* Dev helper: call _testComplete() in browser console to preview completion screen */
+    window._testComplete = function() { session = SESSIONS; showCompletion(); };
 
     /* Timer buttons: click to start / stop */
     timerBtns.forEach(function(btn) {
@@ -1315,7 +1444,7 @@
 
     /* Pause / resume */
     pomoPause.addEventListener('click', function() {
-      if (state === 'idle') return;
+      if (state === 'idle' || state === 'complete') return;
       paused = !paused;
       if (state === 'break') {
         if (paused) breakAudio.pause();
