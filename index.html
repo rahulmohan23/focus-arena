@@ -50,9 +50,16 @@
       object-fit: cover;
       pointer-events: none;
       display: block;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.6s ease;
     }
     .scene-bg.fading { opacity: 0; }
+
+    /* Video layer sits on top; fades in/out over the image */
+    .scene-video {
+      z-index: 1;
+      opacity: 0;
+    }
+    .scene-video.active-video { opacity: 1; }
 
     /* ══════════════════════════════════
        HEADER
@@ -606,8 +613,10 @@
 <body>
 <div id="app">
 
-  <!-- Background -->
-  <img class="scene-bg" src="Screens/Backgorund/scenes=focus.jpg" alt="Focus scene" />
+  <!-- Background image (fallback layer) -->
+  <img class="scene-bg" id="scene-img" src="Screens/Backgorund/scenes=focus.jpg" alt="Background" />
+  <!-- Background video (top layer for video scenes) -->
+  <video class="scene-bg scene-video" id="scene-video" loop muted playsinline></video>
 
   <!-- Header -->
   <header class="header" id="header">
@@ -828,25 +837,53 @@
 
   /* ── Scene switching (works for both desktop nav + mobile accordion) ── */
   const scenes = {
-    skyline: 'Screens/Backgorund/scenes=skyline.jpg',
-    calm:    'Screens/Backgorund/scenes=calm.jpg',
-    room:    'Screens/Backgorund/scenes=room.jpg',
-    focus:   'Screens/Backgorund/scenes=focus.jpg',
-    drive:   'Screens/Backgorund/scenes=drive.jpg',
+    skyline: { type: 'image', src: 'Screens/Backgorund/scenes=skyline.jpg' },
+    calm:    { type: 'image', src: 'Screens/Backgorund/scenes=calm.jpg' },
+    room:    { type: 'video', src: 'Background videos/scenes=room.mp4'   },
+    focus:   { type: 'video', src: 'Background videos/scenes=focus.mp4'  },
+    drive:   { type: 'image', src: 'Screens/Backgorund/scenes=drive.jpg' },
   };
-  const bg = document.querySelector('.scene-bg');
+  const bgImg   = document.getElementById('scene-img');
+  const bgVideo = document.getElementById('scene-video');
+
+  /* Boot: load the default focus video */
+  bgVideo.src = scenes.focus.src;
+  bgVideo.load();
+  bgVideo.play().catch(function(){});
+  bgVideo.classList.add('active-video');
 
   function switchScene(sceneName) {
-    if (!scenes[sceneName]) return;
-    /* Sync active on all [data-scene] elements */
+    var scene = scenes[sceneName];
+    if (!scene) return;
+
     document.querySelectorAll('[data-scene]').forEach(function(el) {
       el.classList.toggle('active', el.dataset.scene === sceneName);
     });
-    bg.classList.add('fading');
-    setTimeout(function() {
-      bg.src = scenes[sceneName];
-      bg.onload = function() { bg.classList.remove('fading'); };
-    }, 250);
+
+    if (scene.type === 'video') {
+      /* Fade video out, swap source, fade back in */
+      bgVideo.classList.remove('active-video');
+      setTimeout(function() {
+        bgVideo.src = scene.src;
+        bgVideo.load();
+        bgVideo.play().catch(function(){});
+        bgVideo.classList.add('active-video');
+      }, 400);
+    } else {
+      if (bgVideo.classList.contains('active-video')) {
+        /* From video → image: load image underneath, then fade out video */
+        bgImg.src = scene.src;
+        bgVideo.classList.remove('active-video');
+      } else {
+        /* From image → image: crossfade the image layer */
+        bgImg.classList.add('fading');
+        setTimeout(function() {
+          bgImg.src = scene.src;
+          bgImg.onload = function() { bgImg.classList.remove('fading'); };
+          if (bgImg.complete) bgImg.classList.remove('fading');
+        }, 300);
+      }
+    }
   }
 
   /* Desktop scene-nav */
