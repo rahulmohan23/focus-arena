@@ -336,6 +336,26 @@
       cursor: default;
     }
 
+    /* Delete button — hidden until row is hovered */
+    .task-delete {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      margin-top: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: all;
+    }
+    .task-row:hover .task-delete { opacity: 0.4; }
+    .task-delete:hover { opacity: 1 !important; }
+
     /* Checkbox */
     .checkbox {
       flex-shrink: 0;
@@ -928,8 +948,19 @@
       label.textContent = task.text;
       label.addEventListener('dblclick', () => { editingId = task.id; renderTasks(); });
 
+      /* Delete button */
+      const del = document.createElement('button');
+      del.className = 'task-delete';
+      del.title = 'Delete task';
+      del.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="#313131" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+      del.addEventListener('click', () => {
+        tasks = tasks.filter(t => t.id !== task.id);
+        renderTasks();
+      });
+
       row.appendChild(cb);
       row.appendChild(label);
+      row.appendChild(del);
       list.appendChild(row);
     });
 
@@ -1046,7 +1077,7 @@
 
     /* Mouse */
     sticky.addEventListener('mousedown', e => {
-      if (e.target.closest('.checkbox') || e.target.closest('input')) return;
+      if (e.target.closest('.checkbox') || e.target.closest('input') || e.target.closest('.task-delete')) return;
       e.preventDefault();
       onStart(e.clientX, e.clientY);
     });
@@ -1055,7 +1086,7 @@
 
     /* Touch */
     sticky.addEventListener('touchstart', e => {
-      if (e.target.closest('.checkbox') || e.target.closest('input')) return;
+      if (e.target.closest('.checkbox') || e.target.closest('input') || e.target.closest('.task-delete')) return;
       const t = e.touches[0];
       onStart(t.clientX, t.clientY);
     }, { passive: true });
