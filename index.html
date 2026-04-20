@@ -658,11 +658,11 @@
 
       <!-- Scene nav: desktop + tablet only -->
       <div class="scene-nav">
-        <span data-scene="skyline">Skyline</span>
-        <span data-scene="calm">Calm</span>
-        <span data-scene="room">Room</span>
-        <span data-scene="focus" class="active">Focus</span>
-        <span data-scene="drive">Drive</span>
+        <span data-scene="skyline">Skyline(S)</span>
+        <span data-scene="calm">Calm(C)</span>
+        <span data-scene="room">Room(R)</span>
+        <span data-scene="focus" class="active">Focus(F)</span>
+        <span data-scene="drive">Drive(D)</span>
       </div>
 
       <!-- Menu button: mobile only -->
@@ -684,11 +684,11 @@
 
     <!-- Mobile scene selection panel (edge-to-edge, flat list) -->
     <div class="mobile-menu" id="mobile-menu">
-      <span data-scene="skyline">Skyline</span>
-      <span data-scene="calm">Calm</span>
-      <span data-scene="room">Room</span>
-      <span data-scene="focus" class="active">Focus</span>
-      <span data-scene="drive">Drive</span>
+      <span data-scene="skyline">Skyline(S)</span>
+      <span data-scene="calm">Calm(C)</span>
+      <span data-scene="room">Room(R)</span>
+      <span data-scene="focus" class="active">Focus(F)</span>
+      <span data-scene="drive">Drive(D)</span>
     </div>
   </header>
 
@@ -923,6 +923,15 @@
       var item = e.target.closest('[data-scene]');
       if (!item || item.classList.contains('active')) return;
       switchScene(item.dataset.scene);
+    });
+
+    /* Keyboard shortcuts: S C R F D */
+    var sceneKeys = { s: 'skyline', c: 'calm', r: 'room', f: 'focus', d: 'drive' };
+    document.addEventListener('keydown', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var scene = sceneKeys[e.key.toLowerCase()];
+      if (scene) switchScene(scene);
     });
   })();
 
